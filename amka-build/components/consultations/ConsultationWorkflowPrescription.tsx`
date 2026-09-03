@@ -1,0 +1,252 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import React from "react";
+import { Pill, Activity, HeartPulse, Brain, Building2, Bandage, Bone, Scissors, Plus, X, Trash2, Save } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { Badge } from "@/components/ui/Badge";
+import { SERVICE_TYPE_ICONS, SERVICE_TYPE_LABELS } from "@/lib/workflow-types";
+import { formatMoney } from "@/lib/utils";
+
+interface WorkflowItem {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  type: 'medical_act' | 'medication';
+}
+
+export function ConsultationWorkflowPrescription({
+  consultationId,
+  patientId,
+  prescribedBy,
+  initialItems = [],
+  onSave,
+}: {
+  consultationId: string;
+  patientId: string;
+  prescribedBy: string;
+  initialItems?: any[];
+  onSave: (items: any[]) => Promise<void>;
+}) {
+  const [actCatalog, setActCatalog] = useState<WorkflowItem[]>([]);
+  const [medCatalog, setMedCatalog] = useState<WorkflowItem[]>([]);
+  const [selectedItems, setSelectedItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    async function loadCatalogs() {
+      setLoading(true);
+      const [actsRes, medsRes] = await Promise.all([
+        supabase.from("medical_act_types").select("*").eq("is_active", true),
+        supabase.from("medications").select("*").eq("is_active", true),
+      ]);
+
+      setActCatalog((actsRes.data || []).map((a: any) => ({
+        id: a.id, name: a.name, price: a.price, category: a.category, type: 'medical_act' as const
+      })));
+      setMedCatalog((medsRes.data || []).map((m: any) => ({
+        id: m.id, name: m.name, price: m.price, category: m.category, type: 'medication' as const
+      })));
+
+      if (initialItems.length > 0) {
+        setSelectedItems(initialItems);
+      }
+      setLoading(false);
+    }
+    void loadCatalogs();
+  }, [initialItems]);
+
+  const addItem = (item: WorkflowItem) => {
+    setSelectedItems(prev => [...prev, {
+      id: null, //’ll be generated on save
+      item_id: item.id,
+      item_name: item.name,
+      item_type: item.type,
+      unit_price: item.price,
+      total_price: item.price,
+      quantity: 1,
+      category: item.category,
+      dosage: "",
+      posology: "",
+      duration: "",
+      notes: "",
+    }]);
+  };
+
+  const removeItem = (index: number) => {
+    setSelectedItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await onSave(selectedItems);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <div className="p-6 skeleton h-64" />;
+
+  // Group acts by category
+  const groupedActs = actCatalog.reduce((acc, act) => {
+    const cat = act.category || "AUTRES";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(act);
+    return acc;
+  }, {} as Record<string, WorkflowItem[]>);
+
+  return (
+    <section className="medical-card p-6 mt-6 animate-fade-in">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h3 className="text-lg font-bold text-text flex items-center gap-2">
+            <Activity className="text-primary" size={20} />
+            Prescriptions du Workflow
+          </h3>
+          <p className="text-xs text-muted">Prescriptions d'actes médicaux et de médicaments</p>
+        </div}
+        <button onClick={handleSave} disabled={saving || selectedItems.length === 0} className="btn-primary flex items-center gap-2">
+          {saving ? "Enregistrement..." : <><Save size={16} /> Enregistrer</>}
+        </button>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Catalog Section */}
+        <div className="space-y-6">
+          <div className="space-y-6">
+            <p className="text-xs font-bold uppercase text-muted px-1">Actes Médicaux</p>
+
+            {Object.entries(groupedActs).map(([category, acts]) => (
+              <div key={category} className="space-y-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-[10px] font-black uppercase text-primary tracking-wider">
+                    {SERVICE_TYPE_LABELS[category as keyof typeof SERVICE_TYPE_LABELS] || category}
+                  </span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {acts.map(act => (
+                    <button
+                      key={act.id}
+                      onClick={() => addItem(act)}
+                      className="btn-secondary text-xs py-1 px-3 flex items-center gap-1 hover:bg-primary/10 hover:text-primary transition-all"
+                    >
+                      {SERVICE_TYPE_ICONS[category as keyof typeof SERVICE_TYPE_ICONS] &&
+                        React.createElement(SERVICE_TYPE_ICONS[category as keyof typeof SERVICE_TYPE_ICONS], { size: 12 })}
+                      {act.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-3 pt-4 border-t border-border">
+            <p className="text-xs font-bold uppercase text-muted px-1">Médicaments</p>
+            <div className="flex flex-wrap gap-2">
+              {medCatalog.map(med => (
+                <button
+                  key={med.id}
+                  onClick={() => addItem(med)}
+                  className="btn-secondary text-xs py-1 px-3 flex items-center gap-1 hover:bg-primary/10 hover:text-primary transition-all"
+                >
+                  <Pill size={12} /> {med.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Selected Items Section */}
+        <div className="space-y-3">
+          <p className="text-xs font-bold uppercase text-muted px-1">Items Prescrits</p>
+          {selectedItems.length === 0 ? (
+            <div className="p-8 text-center border border-dashed border-border rounded-xl bg-surface-soft">
+              <p className="text-sm text-muted">Aucun item prescrit pour le moment.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {selectedItems.map((item, idx) => (
+                <div key={idx} className="p-4 rounded-xl border border-border bg-white space-y-3 group">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {item.item_type === 'medical_act' ?
+                        <Activity size={14} className="text-primary" /> :
+                        <Pill size={14} className="text-primary" />
+                      }
+                      <span className="font-bold text-sm">{item.item_name}</span>
+                      <Badge tone="neutral" className="text-[10px]">{item.category}</Badge>
+                    </div>
+                    <button onClick={() => removeItem(idx)} className="text-muted hover:text-error transition-colors">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-muted block mb-1">Quantité</label>
+                      <input
+                        type="number"
+                        className="input-field text-sm py-1"
+                        value={item.quantity}
+                        onChange={e => {
+                          const newItems = [...selectedItems];
+                          newItems[idx].quantity = Number(e.target.value);
+                          newItems[idx].total_price = newItems[idx].unit_price * newItems[idx].quantity;
+                          setSelectedItems(newItems);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-muted block mb-1">Prix Total</label>
+                      <p className="text-sm font-bold py-1">{formatMoney(item.total_price)}</p>
+                    </div>
+                  </div >
+
+                  {item.item_type === 'medication' && (
+                    <div className="space-y-2 pt-2 border-t border-border/50">
+                      <input
+                        className="input-field text-sm py-1"
+                        placeholder="Dosage (ex: 500mg)"
+                        value={item.dosage}
+                        onChange={e => {
+                          const newItems = [...selectedItems];
+                          newItems[idx].dosage = e.target.value;
+                          setSelectedItems(newItems);
+                        }}
+                      />
+                      <input
+                        className="input-field text-sm py-1"
+                        placeholder="Posologie (ex: 1 matin et soir)"
+                        value={item.posology}
+                        onChange={e => {
+                          const newItems = [...selectedItems];
+                          newItems[idx].posology = e.target.value;
+                          setSelectedItems(newItems);
+                        }}
+                      />
+                      <input
+                        className="input-field text-sm py-1"
+                        placeholder="Durée (ex: 7 jours)"
+                        value={item.duration}
+                        onChange={e => {
+                          const newItems = [...selectedItems];
+                          newItems[idx].duration = e.target.value;
+                          setSelectedItems(newItems);
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}

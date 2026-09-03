@@ -1,0 +1,90 @@
+{
+  "name": "amka-medical-system",
+  "version": "1.0.0",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && node copy-standalone-assets.js",
+    "build:export": "set CAPACITOR=1 && next build && npx cap sync android",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "electron:dev": "next build && electron .",
+    "electron:build": "electron-builder build --win",
+    "cap:init": "npx cap init 'AMKA Perception' com.amka.perception --web-dir out",
+    "cap:add": "npx cap add android",
+    "cap:sync": "npx cap sync android",
+    "cap:open": "npx cap open android",
+    "cap:dev": "set CAPACITOR=1 && next build && npx cap sync android && npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "@supabase/auth-helpers-nextjs": "^0.10.0",
+    "@supabase/supabase-js": "^2.45.4",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
+    "jspdf": "^2.5.2",
+    "jspdf-autotable": "^3.8.4",
+    "lucide-react": "^0.468.0",
+    "next": "^14.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.13.3",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.6",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.5.2",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "postcss": "^8.5.16",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.6.3"
+  },
+  "build": {
+    "appId": "com.amka.medical-system",
+    "productName": "Amka Medical System",
+    "files": [
+      "electron/**/*",
+      ".next/standalone/**/*",
+      ".next/static/**/*",
+      "public/**/*",
+      "next.config.mjs",
+      "package.json",
+      ".env*"
+    ],
+    "asarUnpack": [
+      ".next/standalone/**/*",
+      ".next/static/**/*",
+      ".env*",
+      "next.config.mjs",
+      "package.json",
+      "public/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".next/standalone/node_modules",
+        "to": "app.asar.unpacked/.next/standalone/node_modules"
+      }
+    ],
+    "directories": {
+      "output": "release_v4"
+    },
+    "asar": true,
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": true
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Amka Medical System"
+    }
+  }
+}
